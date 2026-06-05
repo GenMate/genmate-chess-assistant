@@ -30,7 +30,6 @@ lichess.org/@/GenMate
 
 - Lichess: lichess.org/@/GenMate
 - YouTube: youtube.com/@genmate
-- Boosty: boosty.to/genmate
 
 ## License
 
