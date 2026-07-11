@@ -2,15 +2,13 @@
 // Copyright (C) 2026 GenMate
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// ═══════════════════════════════════════════════════════════════════
 //  CONFIG — edit these to customise the hint box without diving deep
-// ═══════════════════════════════════════════════════════════════════
 
 // Font sizes (px)
 const HDR_FONT  = 15;   // engine name + depth label
 const BODY_FONT = 17;   // move hint (piece + evaluation)
 
-// ── Evaluation thresholds (centipawns) ───────────────────────────
+// Evaluation thresholds (centipawns)
 // POV is always from the token-holder's perspective:
 //   positive = player has advantage, negative = player is worse
 // Convention: + means White better, − means Black better (standard chess)
@@ -20,10 +18,10 @@ const EVAL_GOOD_THRESHOLD = 62;  // pov > +62 cp  → player is clearly better �
 const EVAL_BAD_THRESHOLD  = 62;  // pov < −62 cp  → player is clearly worse  → red
                                   // between −62 and +62 cp → roughly equal   → neutral
 
-// ── Brand name shown in the hint header ──────────────────────────
+// Brand name shown in the hint header
 const BRAND_NAME = 'GenMate Chess Assistant';   // full name (English)
 
-// ── Status-message typography (token needed / no game / game over) ─
+// Status-message typography (token needed / no game / game over)
 // Hierarchy: the brand name is the primary line (larger, calm light colour);
 // the guidance line is secondary (smaller, soft muted colour, not bold).
 // The status colour lives mainly on the thin border accent, not the text,
@@ -34,7 +32,7 @@ const CLR_STATUS_NAME    = '#86efac'; // soft green — brand name (positive, br
 const CLR_STATUS_TEXT    = '#dde5ef'; // near-white slate — guidance text (clear, prominent)
 const CLR_STATUS_RULE    = '#3a4660'; // thin divider line under the brand name
 
-// ── Hint-box colours ─────────────────────────────────────────────
+// Hint-box colours
 const CLR_GOOD    = '#86efac'; // green  — player has clear advantage
 const CLR_BAD     = '#f87171'; // red    — player is clearly worse
 const CLR_NEU     = '#e2e8f0'; // light  — roughly equal position
@@ -46,7 +44,7 @@ const CLR_GEAR    = '#60a5fa'; // blue   — gear icon (shown only when analysin
 const CLR_HDR     = '#94a3b8'; // muted  — header row text (engine name, depth)
 const CLR_GENMATE = '#e2e8f0'; // bright — brand label in hint header
 
-// ── Border colours (match body colour family) ────────────────────
+// Border colours (match body colour family)
 const BRD_GOOD    = '#22c55e'; // green border when player is winning
 const BRD_WAIT    = '#0ea5e9'; // blue border while thinking
 const BRD_ERR     = '#eab308'; // soft gold border on warnings — noticeable, not glaring
@@ -64,18 +62,17 @@ const TXT_VS_HUMAN   = 'Works only in games\nvs computer';
 const TXT_ENG_ERR    = 'Extension error\nTry reloading the page';
 const TXT_GAME_OVER  = 'Game over: ';   // status appended after
 
-// ═══════════════════════════════════════════════════════════════════
 
 // ==================== STATE ====================
 let cfg = {
   token: '', mode: 'infinite', movetime: 3000,
   enableHints: true, showEval: true, showFullMove: false,
+  multiPv: 1, masterMode: false, hintMode: 'piece',
 };
-const MULTI_PV = 1;
 
 const INIT_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
-// ── Debug logging ────────────────────────────────────────────────
+// Debug logging
 // Set DEBUG = true to print diagnostic logs to the console. Kept OFF in
 // release for a clean console; a user reporting a bug can flip it to true,
 // reload the extension, reproduce, and copy the [GM-DBG] lines. All debug
@@ -214,7 +211,11 @@ function ensureHint() {
     background: 'rgba(13,16,22,0.96)', color: '#e6eaf2',
     padding: '12px 16px', borderRadius: '10px',
     font: BODY_FONT + 'px/1.65 Inter,system-ui,Arial,sans-serif',
-    border: `1px solid ${BRD_DEFAULT}`, minWidth: '220px',
+    // Fixed width so the card NEVER changes size between states (hint, "Game
+    // over", "Connecting", "vs computer", "Engine starting"). Sized for the
+    // widest case + buffer; height may still vary with the number of lines.
+    // Tune GM_CARD_WIDTH if the longest line ever needs more room.
+    border: `1px solid ${BRD_DEFAULT}`, width: '300px',
     boxShadow: '0 4px 24px rgba(0,0,0,.6)',
     cursor: 'grab', userSelect: 'none', transition: 'border-color .2s',
     whiteSpace: 'pre-line',
@@ -348,6 +349,20 @@ function fmtMoveWithPiece(fen, mv) {
   return (name && p !== 'p') ? name + ' ' + move : move;
 }
 
+// Training format: piece + start square + ► marker, TARGET HIDDEN.
+// Unified for ALL pieces incl. pawn: "Rook d2 ►", "Pawn e2 ►". A space sits
+// before ► so it never reads as glued/dense. ► = U+25BA (bold, clear at small
+// video scale). Master mode (easter egg) overrides this with the full move.
+function fmtPieceOrigin(fen, mv) {
+  if (!fen || !mv || mv.length < 4) return mv || '';
+  const from  = mv.slice(0, 2);
+  const srcCh = charAtSq(fen, from);
+  const arrow = '\u25BA';
+  if (!srcCh) return from + ' ' + arrow;
+  const name = PIECE_EN[srcCh.toLowerCase()] || '';
+  return name ? name + ' ' + from + ' ' + arrow : from + ' ' + arrow;
+}
+
 // ==================== RENDER PV LINES ====================
 // Persistent gear DOM — animation never restarts, no visual jump
 function renderPvLines() {
@@ -399,7 +414,14 @@ function renderPvLines() {
                 pov < -EVAL_BAD_THRESHOLD   ? CLR_BAD  : CLR_NEU;
     }
 
-    const moveTxt = cfg.showFullMove ? fmtMoveWithPiece(L.snapFen, L.bestMove) : L.piece;
+    // Hint detail:
+    //   master mode (easter egg) → full move "Rook d2-d4" (self-check)
+    //   "piece"  → piece name only "Rook"  (find both squares)
+    //   default  → piece + start square "Rook d2 ►" (target hidden)
+    let moveTxt;
+    if (cfg.masterMode)            moveTxt = fmtMoveWithPiece(L.snapFen, L.bestMove);
+    else if (cfg.hintMode === 'piece') moveTxt = pieceAt(L.snapFen, L.bestMove);
+    else                          moveTxt = fmtPieceOrigin(L.snapFen, L.bestMove);
 
     rows += '<tr>'
       + `<td style="padding:3px 8px 3px 0;color:${CLR_GEAR};font-weight:700">[${k}]</td>`
@@ -439,7 +461,7 @@ function renderPvLines() {
 
   const bodyEl = hintEl.querySelector('#gm-body');
   if (bodyEl) bodyEl.innerHTML =
-    `<table style="border-collapse:collapse;font-size:${BODY_FONT}px">${rows}</table>`;
+    `<table style="border-collapse:collapse;width:100%;font-size:${BODY_FONT}px">${rows}</table>`;
 
   hintEl.style.textAlign   = 'left';
   hintEl.style.fontWeight  = 'normal';
@@ -515,13 +537,13 @@ async function analyzePosition(fen) {
 
   // Start the local engine right away — this is the hot path for the hint.
   analyzing = true;
-  startAnalysisTimer(); // watchdog: сброс если background не ответит за 8s
+  startAnalysisTimer(); // watchdog: reset if the background does not answer within 8s
   tlog('ENGINE_ANALYZE sent jobId=' + myJobId);
   browser.runtime.sendMessage({
     type: 'ENGINE_ANALYZE', fen,
     movetime: cfg.movetime || 3000,
     infinite: cfg.mode === 'infinite',
-    multiPv: MULTI_PV, jobId: myJobId,
+    multiPv: cfg.multiPv || 1, jobId: myJobId,
   }).then(resp => {
     tlog('ENGINE_ANALYZE resp ok=' + (resp&&resp.ok) + ' ready=' + (resp&&resp.ready));
     if (!resp?.ok) { showHint(TXT_ENG_ERR, 'err'); analyzing = false; clearAnalysisTimer(); return; }
@@ -560,7 +582,7 @@ browser.runtime.onMessage.addListener(msg => {
         const piece = pieceAt(snap, pm[1]);
         const newDepth = +dm[1];
         const prevDepth = pvLines[pvIdx] ? pvLines[pvIdx].depth : 0;
-        // Обновляем только если глубина растёт (не перезаписываем cloud более мелким depth)
+        // update only when depth grows (never overwrite a cloud eval with a shallower one)
         if (piece !== '?' && newDepth >= prevDepth) {
           // UCI score cp/mate is side-to-move POV. Convert to white's POV (our standard).
           const engIsBlack = snap.split(' ')[1] === 'b';
@@ -603,15 +625,16 @@ browser.runtime.onMessage.addListener(msg => {
     return;
   }
 
-  if (msg.type === 'FLIP_COLOR') {
-    playerColor = playerColor === 'w' ? 'b' : (playerColor === 'b' ? 'w' : 'w');
-    pvLines = {}; lastFen = null; analyzing = false;
+  if (msg.type === 'SET_MASTER') {
+    // Easter-egg toggle from popup: full-move "Master mode" on/off.
+    cfg.masterMode = !!msg.on;
+    pvLines = {}; lastFen = null;
     if (currentFen) analyzePosition(currentFen);
     return;
   }
 
   if (msg.type === 'SETTINGS_CHANGED') {
-    browser.storage.sync.get(['token','mode','movetime','enableHints','showEval','showFullMove'])
+    browser.storage.sync.get(['token','mode','movetime','enableHints','showEval','showFullMove','multiPv','masterMode','hintMode'])
       .then(s => {
         cfg = Object.assign({}, cfg, s);
         if (!cfg.enableHints) { showHint('Hints off'); return; }
@@ -625,7 +648,7 @@ browser.runtime.onMessage.addListener(msg => {
 function checkGameAllowed(data) {
   const white = data.white || {}, black = data.black || {};
 
-  // ── Variant gate (v1: standard chess only) ──────────────────────
+  // Variant gate (v1: standard chess only)
   // The bundled chess.js is classic-only — it cannot apply Chess960 castling,
   // which silently corrupts move replay (engine ends up analysing a stale
   // position). Until 960 is properly supported, treat any non-standard variant
@@ -846,7 +869,7 @@ function gameIdFromUrl(u) {
 
 async function init() {
   const s = await browser.storage.sync.get(
-    ['token','mode','movetime','enableHints','showEval','showFullMove']);
+    ['token','mode','movetime','enableHints','showEval','showFullMove','multiPv','masterMode','hintMode']);
   cfg = Object.assign({}, cfg, s);
   ensureHint();
 

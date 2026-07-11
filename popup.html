@@ -68,7 +68,7 @@
     #token-input:focus { border-color: #60a5fa; }
 
     /* ---- MODE SELECT ---- */
-    #mode-select {
+    #mode-select, #pv-select, #engine-select, #hint-select {
       width: 100%;
       padding: 9px 30px 9px 10px;
       border-radius: 8px;
@@ -84,7 +84,34 @@
       background-repeat: no-repeat;
       background-position: right 10px center;
     }
-    #mode-select:focus { border-color: #22c55e; }
+    #mode-select:focus, #pv-select:focus, #engine-select:focus, #hint-select:focus { border-color: #22c55e; }
+
+    /* token saved-indicator in the title row + reset hint */
+    .token-title-row { display: flex; align-items: center; justify-content: space-between; }
+    .token-check { cursor: default; font-size: 14px; color: #22c55e; user-select: none; line-height: 1; }
+    /* keep the Engine section title clear of the dropdown above it */
+    #engine-section { margin-top: 6px; }
+
+    /* ---- COMPACT TWO-COLUMN ROWS ---- */
+    .row2 { display: flex; gap: 10px; align-items: flex-start; }
+    .row2 .col { flex: 1 1 0; min-width: 0; }
+    .mode-row { display: flex; gap: 6px; align-items: center; }
+    .mode-row select { flex: 1 1 auto; width: auto; min-width: 0; }
+    /* inline seconds field, shown only in Timed mode (toggled from JS) */
+    .sec-input {
+      width: 44px; flex: 0 0 44px;
+      padding: 9px 4px; border-radius: 8px;
+      border: 1px solid #4b5563; background: #111827; color: #fff;
+      font-size: 13px; font-weight: 600; text-align: center; outline: none;
+    }
+    .sec-input:focus { border-color: #22c55e; }
+    /* compact inline checkboxes (Eval / From-square) */
+    .chk { display: flex; align-items: center; gap: 8px; flex: 1 1 0;
+           font-size: 13px; font-weight: 500; color: #e2e8f0; cursor: pointer; }
+    .chk input[type=checkbox] { width: 16px; height: 16px; accent-color: #22c55e; cursor: pointer; flex-shrink: 0; }
+    /* donate (Tip) link — heart accent */
+    .tip-btn span { color: #fca5a5; font-weight: 600; }
+    .tip-btn:hover { border-color: #ef4444; }
 
     /* ---- TIMED INPUT (shown only when Timed selected) ---- */
     #timed-wrapper {
@@ -248,9 +275,12 @@
 <body>
 
   <div class="header">
-    <img src="icons/icon48.png" class="logo" alt="GenMate">
+    <img src="icons/icon48.png" class="logo" id="gm-logo" alt="GenMate">
+    <!-- gm-logo: 8 left-clicks → Master mode ON; 3 wheel-clicks → OFF.
+         Easter egg (hidden trainer view = full move). Hide nothing here;
+         logic lives in popup.js under "MASTER MODE EASTER EGG". -->
     <div class="title">GenMate</div>
-    <div class="subtitle">CHESS ASSISTANT · LITE v1 — Stockfish 18 Lite</div>
+    <div class="subtitle" id="gm-subtitle">CHESS ASSISTANT · v1.1</div>
   </div>
 
   <div class="content">
@@ -261,34 +291,71 @@
       <span id="news-close" title="Dismiss">&times;</span>
     </div>
 
-    <div class="section-title">Lichess OAuth Token</div>
+    <!-- GENMATE: TOKEN ENTRY (compact)
+          Token entered ONCE via "Save token". The box in the title row
+          is a SAVED indicator (☑ = saved, ☐ = empty). The input row
+          collapses after saving. RESET = 3 wheel-clicks on the box
+          (tooltip explains). No reset button — saves popup space.
+          KEEP this block. popup.js toggles the row and handles reset.
+          -->
+    <div class="section-title token-title-row">
+      <span>Lichess OAuth Token</span>
+      <span id="token-check" class="token-check" title="3 wheel-clicks here to reset the token">&#9744;</span>
+    </div>
     <div id="token-block" class="token-block">
       1. Go to <a href="https://lichess.org/account/oauth/token/create" target="_blank">lichess.org → API tokens</a><br>
       2. Enable scope <b>board:play</b><br>
       3. Paste the token below
       <input type="password" id="token-input" placeholder="lip_… (paste your token)">
+      <button id="token-save" class="btn btn-save" style="margin-top:8px;">Save token</button>
+    </div>
+    <!-- end GENMATE: TOKEN ENTRY -->
+
+    <div class="row2">
+      <div class="col">
+        <div class="section-title">Analysis</div>
+        <div class="mode-row">
+          <select id="mode-select">
+            <option value="infinite">Infinite</option>
+            <option value="timed">Timed</option>
+          </select>
+          <input type="text" id="movetime-input" class="sec-input" value="3"
+                 inputmode="decimal" title="Seconds per move (decimals allowed: 3 or 3.5)"
+                 placeholder="sec" style="display:none;">
+        </div>
+      </div>
+      <div class="col">
+        <div class="section-title">Lines</div>
+        <select id="pv-select">
+          <option value="1" selected>1</option>
+          <option value="2">2</option>
+        </select>
+      </div>
     </div>
 
-    <div class="section-title">Analysis Mode</div>
-    <select id="mode-select">
-      <option value="infinite">Infinite (recommended)</option>
-      <option value="timed">Timed</option>
-    </select>
-    <div id="timed-wrapper">
-      <label for="movetime-input">Seconds per move:</label>
-      <input type="number" id="movetime-input" value="3" min="1" max="300" step="1">
-      <span>sec</span>
+    <!-- GENMATE: ENGINE SELECTOR
+          KEEP THIS BLOCK IN CODE. It may be HIDDEN with the flag
+          SHOW_ENGINE_SELECTOR = false in popup.js, yet it must STAY.
+          Both engines ship in wasm/ and remain game-ready at all times;
+          this control only chooses which one is live. Hiding the UI
+          does NOT remove the spare engine. Show again by flipping flag.
+          -->
+    <div id="engine-section">
+      <div class="section-title">Engine</div>
+      <select id="engine-select">
+        <option value="full">Strong — Stockfish 18 full NNUE (~108 MB)</option>
+        <option value="lite">Light — Stockfish 18 Lite (~7 MB)</option>
+      </select>
     </div>
+    <!-- end GENMATE: ENGINE SELECTOR -->
 
     <div class="section-title">Display</div>
-    <div class="checkbox-row">
-      <input type="checkbox" id="show-eval" checked>
-      <label for="show-eval">Show evaluation score</label>
+    <div class="row2">
+      <label class="chk"><input type="checkbox" id="show-eval" checked> Eval</label>
+      <label class="chk"><input type="checkbox" id="show-from"> From-square</label>
     </div>
-    <button id="flip-color-btn" class="btn btn-flip">&#x2194; Swap Analysis Side</button>
 
     <button id="engine-toggle" class="btn btn-stop">⏹ Stop Engine</button>
-    <button id="save-btn" class="btn btn-save">Save settings</button>
 
 
   <div class="footer">
@@ -299,13 +366,30 @@
       <span>GenMate on Lichess</span>
     </a>
 
-    <a href="https://www.youtube.com/@genmate" target="_blank" class="social-btn">
+    <!-- GENMATE: TIP / DONATE LINK
+          CloudTips donation page. KEEP IN CODE. Footer order: Lichess,
+          then this Tip link, then the license line.
+          -->
+    <a href="https://pay.cloudtips.ru/p/45b63590" target="_blank" class="social-btn tip-btn">
+      <svg width="20" height="18" viewBox="0 0 24 22" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#ef4444" d="M12 21s-9-5.7-9-12a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.3-9 12-9 12z"/>
+      </svg>
+      <span>Tip GenMate</span>
+    </a>
+
+    <!-- GENMATE: YOUTUBE LINK
+          Link to the GenMate YouTube channel. KEEP IN CODE.
+          Hide/show with the flag SHOW_YOUTUBE in popup.js. When hidden
+          the markup stays here untouched — only its display is toggled.
+          -->
+    <a id="yt-link" href="https://www.youtube.com/@genmate" target="_blank" class="social-btn">
       <svg width="22" height="16" viewBox="0 0 22 16" xmlns="http://www.w3.org/2000/svg">
         <rect width="22" height="16" rx="3.5" fill="#FF0000"/>
         <polygon points="9,4 9,12 16,8" fill="#ffffff"/>
       </svg>
-      <span>Шахматы с GenMate</span>
+      <span>GenMate on YouTube</span>
     </a>
+    <!-- end GENMATE: YOUTUBE LINK -->
 
     <div class="license-line">
       <a href="https://github.com/GenMate/genmate-chess-assistant" target="_blank">Open source (GPL-3.0)</a> &middot; Powered by Stockfish

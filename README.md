@@ -11,25 +11,39 @@ The engine runs entirely in your browser. Nothing is sent to any server.
 2. Select `manifest.json` from this folder
 3. Click the GenMate icon in the browser toolbar
 4. Get a token: [lichess.org/account/oauth/token/create](https://lichess.org/account/oauth/token/create)
-   — enable **board:play** — copy and paste into the popup → **Save**
+   — enable **board:play** — paste it into the popup → **Save token**
 5. Open a game vs computer on Lichess — hints appear automatically
 
 ## Supported games
 
 | Mode | Works |
 |---|---|
-| vs Stockfish (any level) | ✅ |
-| vs Lichess AI | ✅ |
-| vs human | ❌ Full version only |
-| Spectating | ❌ |
+| vs Stockfish (any level) | Yes |
+| vs Lichess AI | Yes |
+| vs human | Full version only |
+| Spectating | No |
 
-Full version (multiple variations, stronger engine):
-lichess.org/@/GenMate
+Full version (more variations, stronger engine): lichess.org/@/GenMate
+
+## Optional: stronger engine
+
+This Lite build ships with the small Stockfish 18 Lite engine. You can switch to
+the full Stockfish 18 NNUE engine without editing any code:
+
+1. Put these two files into the `wasm/` folder:
+   `stockfish-18-single.js` and `stockfish-18-single.wasm`
+2. Reopen the popup — an **Engine** selector appears
+3. Choose **Strong** — the full engine loads on the next analysis
+
+Remove the two files to go back to Lite.
 
 ## Community
 
 - Lichess: lichess.org/@/GenMate
-- YouTube: youtube.com/@genmate
+
+## Support
+
+If it helps you, you can tip the project: pay.cloudtips.ru/p/45b63590
 
 ## License
 

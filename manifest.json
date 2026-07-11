@@ -3,7 +3,7 @@
   "name": "Chess Assistant by GenMate",
   "short_name": "GenMate",
   "description": "Stockfish Lite engine hints while you play vs computer on Lichess",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "permissions": [
     "storage",
     "activeTab",
