@@ -1,6 +1,6 @@
 {
-  "id": "2026-06-welcome",
-  "title": "Welcome to GenMate Chess Assistant!",
-  "body": "Engine hints appear while you play vs the computer on Lichess. Enjoy — and visit my chess page!",
-  "url": "https://lichess.org/@/GenMate"
+  "id": "2026-11-12-v1.2.0",
+  "title": "GenMate Chess Assistant 1.2.0",
+  "body": "Bundled Stockfish 19 Lite and Full; Lite remains the default. Resizable 330px base HUD with viewport-safe positioning and persistent hints during reconnection.",
+  "url": "https://addons.mozilla.org/firefox/addon/chess-assistant-by-genmate/"
 }
