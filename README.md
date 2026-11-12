@@ -1,14 +1,29 @@
-# GenMate Chess Assistant — Lite v1
+# GenMate Chess Assistant 1.2.0
 
 > Engine thinks — you move.
 
-Stockfish 18 Lite hints in real time while you play vs computer on Lichess.
-The engine runs entirely in your browser. Nothing is sent to any server.
+Stockfish 19 hints in real time while you play vs computer on Lichess.
+The engine runs entirely in your browser.
+
+## Changelog
+
+- **1.2.0** — Deep navy HUD and popup with an amber HUD frame, fixed resizable HUD, persistent hints during reconnection, viewport-safe positioning, up to three lines with two by default, stable hint font across line counts, origin-square hints by default, default-on extension news and bundled Stockfish 19 Full. Lite remains the default.
+
+- **1.1.1** — supports the new Lichess game page URLs (`/game/<id>`); legacy
+  URLs (`/<id>`) still work. More reliable reconnection with clear status
+  messages in the hint box (HUD). New data settings page: after installing or
+  updating, allow game access once to use hints. Engine updated to
+  Stockfish 19 Lite (stockfish.js 19.0.1). The cloud evaluation request
+  was removed — analysis is local only. News checks were opt-in in that release; version 1.2.0 enables them by default.
+  Settings and the token are now stored in this browser only (not synced).
+- **1.1.0** — first public release.
 
 ## Quick start
 
-1. Open `about:debugging` in Firefox → **This Firefox** → **Load Temporary Add-on…**
-2. Select `manifest.json` from this folder
+1. Install the extension (signed package from addons.mozilla.org), or for
+   testing: `about:debugging` → **This Firefox** → **Load Temporary Add-on…**
+   → select `manifest.json` from this folder
+2. A **Data settings** tab opens once — click **Allow game access**
 3. Click the GenMate icon in the browser toolbar
 4. Get a token: [lichess.org/account/oauth/token/create](https://lichess.org/account/oauth/token/create)
    — enable **board:play** — paste it into the popup → **Save token**
@@ -18,37 +33,65 @@ The engine runs entirely in your browser. Nothing is sent to any server.
 
 | Mode | Works |
 |---|---|
-| vs Stockfish (any level) | Yes |
-| vs Lichess AI | Yes |
-| vs human | Full version only |
-| Spectating | No |
+| vs Stockfish / Lichess AI (any level) | Yes |
+| Standard chess or "From position" | Yes |
+| Chess960 and other variants | No (the HUD says so) |
+| vs human | No |
+| Lichess TV | No (no HUD) |
+| Spectating | No (hints require access to your own game) |
 
-Full version (more variations, stronger engine): lichess.org/@/GenMate
+## Data
 
-## Optional: stronger engine
+Stockfish analysis runs locally in your browser. With your permission, the
+extension sends your Lichess API token and the ID of the game you open to
+lichess.org, only to read that game's moves. The developer does not receive
+your token, games or positions. The extension also checks a small
+news file hosted on GitHub every few hours; that request contains no token,
+game or browsing data. News checks are enabled by default; unread items can be dismissed.
+The extension stores your token and settings in this
+browser only (not synced). A token saved by version 1.1.0 may also be kept in
+Firefox Sync storage, which Firefox manages; "Remove token" deletes the local
+token and requests deletion of the old Firefox Sync copy; any storage error is
+shown. Removing the token from the extension does not revoke it on Lichess.
+No analytics or telemetry.
 
-This Lite build ships with the small Stockfish 18 Lite engine. You can switch to
-the full Stockfish 18 NNUE engine without editing any code:
+You can change your choice any time: popup → **Data settings**.
 
-1. Put these two files into the `wasm/` folder:
-   `stockfish-18-single.js` and `stockfish-18-single.wasm`
-2. Reopen the popup — an **Engine** selector appears
-3. Choose **Strong** — the full engine loads on the next analysis
+## Engine choice
 
-Remove the two files to go back to Lite.
+Both Stockfish 19 Lite and Full NNUE (single-threaded) are included. Choose the
+engine in the toolbar popup. Lite is the default and uses fewer resources.
+Full starts only when selected; no additional download or installation is needed.
+Only one engine worker runs at a time. Inactive workers are unloaded after the
+existing idle timeout. The package is larger because it contains both engines.
+A failed Full start is reported; it does not silently switch to Lite.
 
-## Community
+Public MultiPV supports 1, 2 or 3 lines. New installations show the piece and
+origin square; existing saved display choices are retained.
 
-- Lichess: lichess.org/@/GenMate
+Stockfish and its networks are GPL-3.0. Exact versions, hashes and source links
+are in THIRD-PARTY-NOTICES. The distribution includes a separate corresponding
+source archive with the original source tree, build instructions and NNUE inputs.
 
-## Support
+## HUD layout
 
-If it helps you, you can tip the project: pay.cloudtips.ru/p/45b63590
+The base HUD is 330 CSS pixels wide. Selecting 1, 2 or 3 lines adjusts its height
+without shrinking the hint font. Two lines are selected by default for new or
+unset preferences. A two-line status area remains reserved during analysis and
+reconnection. Drag the header to move, or use the lower-right grip to resize.
+The gear stays green and scores are bold without an equals prefix.
 
-## License
+Timed analysis keeps its final hints and depth without an extra completion message.
 
-GNU General Public License v3.0
-Source: github.com/GenMate/genmate-chess-assistant
+## Source and packaging
 
-Stockfish © T. Romstad et al. — GPL v3
-chess.js © Jeff Hlywa — BSD 2-Clause
+See [BUILD-AND-SOURCE.md](https://github.com/GenMate/genmate-chess-assistant/blob/main/BUILD-AND-SOURCE.md). This repository intentionally
+keeps the bundled engine JavaScript and WebAssembly files in the established
+`wasm/` layout so a checkout remains directly loadable and packageable. No Git
+LFS pointers or executable downloads are used. The complete corresponding
+engine source and NNUE inputs are distributed as GitHub Release assets.
+
+## Community and license
+
+- Lichess: https://lichess.org/@/GenMate
+- License: GNU General Public License v3.0; see LICENSE and THIRD-PARTY-NOTICES.

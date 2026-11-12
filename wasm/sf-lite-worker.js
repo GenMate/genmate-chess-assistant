@@ -5,7 +5,7 @@ const sfBase = self.location.href.replace(/[^/]+$/, '');
 const _origFetch = self.fetch.bind(self);
 self.fetch = (url, opts) => {
   if (typeof url === 'string' && /\.wasm$/.test(url) && !url.includes('.wasm.map'))
-    url = sfBase + 'stockfish-18-lite-single.wasm';
+    url = sfBase + 'stockfish-19-lite-single.wasm';
   return _origFetch(url, opts);
 };
-importScripts(sfBase + 'stockfish-18-lite-single.js');
+importScripts(sfBase + 'stockfish-19-lite-single.js');

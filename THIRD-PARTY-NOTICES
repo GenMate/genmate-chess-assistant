@@ -1,0 +1,104 @@
+THIRD-PARTY NOTICES — GenMate Chess Assistant 1.2.0
+=========================================================
+
+The extension's own code is licensed under the GNU General Public License
+v3.0 or later (see LICENSE). It bundles the following third-party files,
+unmodified.
+
+
+1. Stockfish 19 chess engine, via stockfish.js 19.0.1 (Lite and Full, single-threaded)
+------------------------------------------------------------------------------
+
+Files:
+  wasm/stockfish-19-lite-single.js    28230 bytes
+    sha256 ccb130d7ff29408531c47d859a49f91d59d4f482d05a53eb1a3231a4f624c91a
+  wasm/stockfish-19-lite-single.wasm  1845971 bytes
+    sha256 ee4f115bdb2d32cadf96cada104a05b5ec257d7ad6f57582190b49bc71f096de
+
+Full files:
+  wasm/stockfish-19-single.js    28130 bytes
+    sha256 8071dee87312f74805a859de933e1a1ef465579ab1a51fbd597388cdce9d444d
+  wasm/stockfish-19-single.wasm  99169054 bytes
+    sha256 991bede2f253ebb08ff01fcc48270f4b9c8e66b12d5bd5f8d6f52eb3e3b3a740
+
+The Full files are unmodified release assets from:
+  https://github.com/nmrugg/stockfish.js/releases/tag/v19.0.1
+Exact port source (includes C++ and build scripts):
+  https://github.com/nmrugg/stockfish.js/tree/0d5dd7944f88c817c07a26bc4fb1905d5f9c46d6
+  https://github.com/nmrugg/stockfish.js/archive/refs/tags/v19.0.1.tar.gz
+Corresponding source with both required networks is provided separately as:
+  stockfish-js-19.0.1-corresponding-source.tar.gz
+Full network: nn-1a298aa575a0.nnue
+  sha256 1a298aa575a085434d29027978dc36867fe9c5bcea9376654b7a8eba1e52dfc2
+Lite network: nn-61e7af4bb97d.nnue
+  sha256 61e7af4bb97d51eeeb25d322916f86513b5cd3a827ce189c98c6e31946f99e5b
+Networks are available from the Stockfish project's network service:
+  https://tests.stockfishchess.org/api/nn/nn-1a298aa575a0.nnue
+  https://tests.stockfishchess.org/api/nn/nn-61e7af4bb97d.nnue
+These are build-time source inputs, not downloaded by the extension.
+
+Both Lite files are byte-identical to bin/stockfish-19-lite-single.{js,wasm} of the
+npm package stockfish@19.0.1 and to the assets of the stockfish.js release
+v19.0.1 (sha256 digests published with the release):
+  https://www.npmjs.com/package/stockfish/v/19.0.1
+  https://github.com/nmrugg/stockfish.js/releases/tag/v19.0.1
+Source code of stockfish.js (build scripts, JavaScript/WebAssembly port):
+  https://github.com/nmrugg/stockfish.js/tree/v19.0.1
+Source code of the Stockfish engine (release sf_19):
+  https://github.com/official-stockfish/Stockfish
+
+Copyright: Stockfish (c) T. Romstad, M. Costalba, J. Kiiski, G. Linscott and
+other Stockfish contributors; stockfish.js (c) 2026 Chess.com, LLC and
+contributors. NNUE network by Chris Bao (sscg13).
+
+License: GNU General Public License v3.0 (full text in LICENSE).
+
+Version 1.1.0 of this extension bundled stockfish.js 18.0.0 Lite
+(stockfish-18-lite-single.js / .wasm); 1.1.1 replaces it with 19.0.1.
+
+The small wrappers wasm/sf-lite-worker.js and wasm/sf-full-worker.js are part
+of this extension (GPL-3.0-or-later), not of stockfish.js.
+
+
+2. chess.js 0.10.3
+------------------
+
+File:
+  chess.js    sha256 1a6803b787dc4a6f71aabdd0b010cee7bf0fc70ce032f5ed8d7738684d431bfc
+
+Byte-identical to chess.js in the npm package chess.js@0.10.3 and to the
+file at the git tag v0.10.3:
+  https://github.com/jhlywa/chess.js/tree/v0.10.3
+  https://www.npmjs.com/package/chess.js/v/0.10.3
+
+Version 1.1.0 of this extension shipped a minified file chess.min.js whose
+origin could not be established (who minified it is unknown). It behaved like
+chess.js 0.10.3 in all 18 tested scenarios and was replaced in 1.1.1 by the
+official, readable file above.
+
+License: BSD 2-Clause (text of LICENSE at tag v0.10.3, sha256
+c09370a8369f5626b396dbb8f77306dd9bbcc48f973977f37067e06de29684ad):
+
+Copyright (c) 2020, Jeff Hlywa (jhlywa@gmail.com)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.

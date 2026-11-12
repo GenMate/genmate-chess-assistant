@@ -1,16 +1,14 @@
 // popup.js — GenMate Chess Assistant v1
+// Copyright (C) 2026 GenMate
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Uses common.js (loaded first by popup.html): loadSettings, saveSettings,
+// removeToken, validateNews, safeNewsUrl.
 
 // GENMATE: UI VISIBILITY FLAGS (keep)
 // Flip to false to HIDE a block in the popup. The markup and logic
 // STAY in code — only display is toggled. Set true to show again.
 const SHOW_ENGINE_SELECTOR = true;   // Engine chooser (lite / full)
-const SHOW_YOUTUBE         = false;  // YouTube link hidden in footer (markup kept for a future link)
-
-// Engine label shown in the popup subtitle (must match background ENGINE_LABELS)
-const ENGINE_LABELS = {
-  lite: 'CHESS ASSISTANT · v1 — Stockfish 18 Lite',
-  full: 'CHESS ASSISTANT · v1 — Stockfish 18 (full NNUE)',
-};
 
 // Seconds-per-move helpers. sanitizeSec: keep digits + one separator while
 // typing, accepting both "." and ",". fmtSec: ms → a clean seconds string
@@ -26,6 +24,11 @@ function fmtSec(ms) {
   return Number.isInteger(sec) ? String(sec) : String(parseFloat(sec.toFixed(3)));
 }
 
+function isLichessUrl(u) {
+  try { const p = new URL(u); return p.protocol === 'https:' && p.hostname === 'lichess.org'; }
+  catch (_) { return false; }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const tokenBlock    = document.getElementById('token-block');
   const tokenInput    = document.getElementById('token-input');
@@ -34,87 +37,98 @@ document.addEventListener('DOMContentLoaded', async () => {
   const movetimeInput = document.getElementById('movetime-input');
   const showEval      = document.getElementById('show-eval');
   const showFrom      = document.getElementById('show-from');
-  const engineToggle  = document.getElementById('engine-toggle');
+  const hintsToggle   = document.getElementById('engine-toggle');
   const engineSelect  = document.getElementById('engine-select');
   const engineSection = document.getElementById('engine-section');
   const gmSubtitle    = document.getElementById('gm-subtitle');
   const tokenSave     = document.getElementById('token-save');
   const tokenCheck    = document.getElementById('token-check');
-  const ytLink        = document.getElementById('yt-link');
+  const tokenRemove   = document.getElementById('token-remove');
+  const statusLine    = document.getElementById('popup-status');
+  const consentNeeded = document.getElementById('consent-needed');
+  const dataSettings  = document.getElementById('data-settings');
 
-  // Apply visibility flags (block stays in DOM; only display toggles)
-  // Engine chooser: the "Full" engine is OFFERED ONLY when its files are truly
-  // present in wasm/. This build ships Lite only, so the Full option must NOT
-  // appear. A plain fetch(ok) is unreliable for a missing packaged file, so we
-  // fetch the engine's .js and require real content (~20 KB). If it is absent,
-  // we both hide the section AND remove the "full" <option> entirely.
-  async function fullEnginePresent() {
-    try {
-      const r = await fetch(browser.runtime.getURL('wasm/stockfish-18-single.js'));
-      if (!r.ok) return false;
-      const t = await r.text();
-      return t.length > 1000;   // real single.js is ~20 KB; missing/empty → false
-    } catch(_) { return false; }
+  // Version in the subtitle comes from the manifest (no hard-coded number).
+  const SUBTITLE = 'CHESS ASSISTANT v' + browser.runtime.getManifest().version;
+  if (gmSubtitle) gmSubtitle.textContent = SUBTITLE;
+
+  // Status line: errors in gold, confirmations in green. Never claims success
+  // that did not happen.
+  function showStatus(text, ok) {
+    if (!statusLine) return;
+    statusLine.textContent = text || '';
+    statusLine.className = 'popup-status' + (ok ? ' ok' : '');
+    statusLine.style.display = text ? '' : 'none';
   }
+
+  // Keep the chooser visible; never offer a missing engine as usable.
   const engineFullOpt = engineSelect ? engineSelect.querySelector('option[value="full"]') : null;
-  if (engineSection) engineSection.style.display = 'none';   // hidden by default
-  if (engineSection && SHOW_ENGINE_SELECTOR) {
-    fullEnginePresent().then(has => {
-      if (has) {
-        engineSection.style.display = '';                   // both engines available
-      } else if (engineFullOpt) {
-        engineFullOpt.remove();                             // never offer a missing engine
-      }
-    });
-  }
-  if (ytLink && !SHOW_YOUTUBE) ytLink.style.display = 'none';
+  if (engineSection) engineSection.style.display = SHOW_ENGINE_SELECTOR ? '' : 'none';
+  if (engineFullOpt) engineFullOpt.disabled = true;
+  browser.runtime.sendMessage({ type: 'GET_ENGINE' }).then(r => {
+    if (!engineFullOpt) return;
+    const available = !!(r && r.fullAvailable);
+    engineFullOpt.disabled = !available;
+    engineFullOpt.textContent = available ? 'Stockfish 19 Full' : 'Stockfish 19 Full (unavailable)';
+  }).catch(() => {});
 
-  // Send message to the active Lichess tab (content script)
+  // ---- Active Lichess tab (content script) ----
+  // Returns the reply, or null when there is no Lichess tab / no content script.
   async function sendToTab(msg) {
     try {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-      if (tab?.id) await browser.tabs.sendMessage(tab.id, msg);
-    } catch(_) {}
+      if (!tab || !Number.isInteger(tab.id) || !isLichessUrl(tab.url)) return null;
+      const r = await browser.tabs.sendMessage(tab.id, msg);
+      return r === undefined ? { ok: true } : r;
+    } catch(_) { return null; }
   }
 
-  // Instant-apply: every option writes to storage and notifies the engine +
-  // page immediately. There is NO Save button — changes take effect at once.
+  // Instant-apply: every option writes to storage.local; the page picks the
+  // change up through storage.onChanged. There is NO Save button.
   async function apply(patch) {
-    await browser.storage.sync.set(patch);
-    await browser.runtime.sendMessage({ type: 'SETTINGS_CHANGED' }).catch(() => {});
-    await sendToTab({ type: 'SETTINGS_CHANGED' });
+    try { await saveSettings(patch); showStatus(''); }
+    catch (_) { showStatus('Could not save the setting: extension storage unavailable'); }
   }
 
   // ---- Load saved settings ----
-  const s = await browser.storage.sync.get(['token', 'mode', 'movetime', 'showEval', 'multiPv', 'engine', 'hintMode']);
+  let s;
+  try { s = await loadSettings(); }
+  catch (_) {
+    s = Object.assign({}, SETTINGS_DEFAULTS);
+    showStatus('Extension storage unavailable');
+  }
 
   // ---- Token UI: one-time entry, collapse after save, ☑ indicator ----
-  const BOX_EMPTY = '\u2610';   // ☐
-  const BOX_TICK  = '\u2611';   // ☑
+  const BOX_EMPTY = '☐';   // ☐
+  const BOX_TICK  = '☑';   // ☑
   function showTokenEntry() {
     tokenBlock.style.display = '';
     if (tokenCheck) tokenCheck.textContent = BOX_EMPTY;
+    if (tokenRemove) tokenRemove.style.display = 'none';
   }
   function showTokenSaved() {
     tokenBlock.style.display = 'none';
     if (tokenCheck) tokenCheck.textContent = BOX_TICK;
+    if (tokenRemove) tokenRemove.style.display = '';
   }
-  if (s.token) { tokenInput.value = s.token; showTokenSaved(); }
+  if (s.token) { showTokenSaved(); }
   else         { showTokenEntry(); }
 
   // ---- Load + bind options (instant-apply) ----
   const mode = s.mode || 'infinite';
   modeSelect.value = mode;
   movetimeInput.style.display = (mode === 'timed') ? '' : 'none';
+  const analysisRow = document.querySelector('.analysis-row');
+  if (analysisRow) analysisRow.className = 'row2 analysis-row' + (mode === 'timed' ? ' timed' : '');
   movetimeInput.value = fmtSec(s.movetime || 3000);
   showEval.checked = s.showEval !== false;       // default ON
-  showFrom.checked = (s.hintMode === 'origin');  // default OFF → piece type only
+  showFrom.checked = (s.hintMode === 'origin');  // default ON; preserve an explicitly saved choice
   pvSelect.value = String(s.multiPv || 1);
 
-  // Mode: show the seconds field only in Timed mode; apply immediately.
   modeSelect.addEventListener('change', () => {
     const timed = modeSelect.value === 'timed';
     movetimeInput.style.display = timed ? '' : 'none';
+    if (analysisRow) analysisRow.className = 'row2 analysis-row' + (timed ? ' timed' : '');
     apply({ mode: modeSelect.value });
   });
 
@@ -132,35 +146,69 @@ document.addEventListener('DOMContentLoaded', async () => {
     apply({ movetime: ms });
   });
 
-  pvSelect.addEventListener('change', () => apply({ multiPv: parseInt(pvSelect.value) || 1 }));
+  pvSelect.addEventListener('change', () => {
+    const value = Number(pvSelect.value);
+    apply({ multiPv: [1, 2, 3].includes(value) ? value : 1 });
+  });
   showEval.addEventListener('change', () => apply({ showEval: showEval.checked }));
   // From-square ON -> "Rook d2 ►"; OFF -> piece type only "Rook". Master overrides.
   showFrom.addEventListener('change', () => apply({ hintMode: showFrom.checked ? 'origin' : 'piece' }));
 
-  // ---- Engine selector (engine name lives in the dropdown, not the subtitle) ----
+  // ---- Engine selector ----
   const engineChoice = (s.engine === 'lite' || s.engine === 'full') ? s.engine : 'lite';
   if (engineSelect) engineSelect.value = engineChoice;
-
   if (engineSelect) {
     engineSelect.addEventListener('change', async () => {
-      const eng = engineSelect.value;
-      // Hot-swap: background tears down the worker and boots the chosen engine.
-      try { await browser.runtime.sendMessage({ type: 'ENGINE_SWITCH', engine: eng }); } catch(_) {}
-      await sendToTab({ type: 'SETTINGS_CHANGED' });
+      // Hot-swap: background tears down the worker and boots the chosen one.
+      try {
+        const r = await browser.runtime.sendMessage({ type: 'ENGINE_SWITCH', engine: engineSelect.value });
+        if (!r || !r.ok) {
+          if (r && r.engine) engineSelect.value = r.engine;
+          showStatus('Could not switch the engine');
+        }
+      }
+      catch(_) { showStatus('Could not switch the engine'); }
     });
   }
 
-  // ---- Token: one-time save + wheel-reset on the ☑ indicator ----
+  // ---- Token: save / remove ----
   if (tokenSave) {
     tokenSave.onclick = async () => {
       const t = tokenInput.value.trim();
       if (!t) return;
-      await browser.storage.sync.set({ token: t });
-      await browser.runtime.sendMessage({ type: 'SETTINGS_CHANGED' }).catch(() => {});
-      await sendToTab({ type: 'SETTINGS_CHANGED' });
+      if (!validTokenText(t)) {
+        showStatus('Token not saved: use printable ASCII characters without spaces');
+        return;
+      }
+      try {
+        await saveSettings({ token: t });
+      } catch (_) {
+        showStatus('Token not saved: extension storage unavailable');
+        return;
+      }
+      tokenInput.value = '';
       showTokenSaved();
+      showStatus('Token saved in this browser', true);
     };
   }
+
+  // Remove token: stop using it in every tab first, then delete the local copy
+  // and request deletion of the old Firefox Sync copy (version 1.1.0 kept the
+  // token there). Success is reported only for what actually completed.
+  async function doRemoveToken() {
+    try { await browser.runtime.sendMessage({ type: 'TOKEN_CLEARED' }); } catch (_) {}
+    const r = await removeToken();
+    if (!r.local) {
+      showStatus('Token NOT removed: extension storage unavailable. Hints stay stopped until the page is reloaded.');
+      return;
+    }
+    tokenInput.value = '';
+    showTokenEntry();
+    if (r.sync) showStatus('Token removed from this browser; deletion of the old Firefox Sync copy was requested.', true);
+    else showStatus('Token removed from this browser, but the old Firefox Sync copy could not be deleted (storage error).');
+    tokenInput.focus();
+  }
+  if (tokenRemove) tokenRemove.addEventListener('click', doRemoveToken);
   // Reset = 3 wheel-clicks on the ☑ box (gap up to 800 ms, touchpad-friendly).
   if (tokenCheck) {
     let wN = 0, wT = 0;
@@ -170,62 +218,57 @@ document.addEventListener('DOMContentLoaded', async () => {
       const now = Date.now();
       wN = (now - wT <= 800) ? wN + 1 : 1;
       wT = now;
-      if (wN >= 3) {
-        wN = 0;
-        await browser.storage.sync.set({ token: '' });
-        await browser.runtime.sendMessage({ type: 'SETTINGS_CHANGED' }).catch(() => {});
-        await sendToTab({ type: 'SETTINGS_CHANGED' });
-        tokenInput.value = '';
-        showTokenEntry();
-        tokenInput.focus();
-      }
+      if (wN >= 3) { wN = 0; doRemoveToken(); }
     });
     tokenCheck.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); });
   }
 
-  // ---- Engine toggle ----
-  // Label shows what WILL HAPPEN on click (action-oriented UX):
-  //   "⏹ Stop Engine"  — currently running → click stops it
-  //   "▶ Start Engine" — currently stopped → click starts it
-  let engineRunning = false;
-
-  function setEngineBtn(running) {
-    engineRunning = running;
-    if (running) {
-      engineToggle.textContent = '\u23F9 Stop Engine';
-      engineToggle.className   = 'btn btn-stop';
-    } else {
-      engineToggle.textContent = '\u25B6 Start Engine';
-      engineToggle.className   = 'btn btn-start';
-    }
+  // ---- Hints on/off (per Lichess tab) ----
+  // Shows the real state of the active tab's HUD; with no Lichess tab the
+  // button is disabled and the status says so.
+  let hintsOn = true;
+  function setHintsBtn(on) {
+    hintsOn = on;
+    hintsToggle.textContent = on ? 'Hints on' : 'Hints off';
+    hintsToggle.className   = on ? 'btn btn-start' : 'btn btn-stop';
+    hintsToggle.title = on ? 'Click to hide hints in this tab' : 'Click to show hints in this tab';
   }
-
-  try {
-    const status = await browser.runtime.sendMessage({ type: 'ENGINE_STATUS' });
-    setEngineBtn(!!(status && status.ready));
-  } catch(_) {
-    setEngineBtn(false);
+  const hud = await sendToTab({ type: 'HUD_GET' });
+  if (!hud || !hud.ok) {
+    setHintsBtn(true);
+    hintsToggle.disabled = true;
+    if (!statusLine || statusLine.style.display === 'none') showStatus('Open a Lichess game to use hints');
+  } else {
+    setHintsBtn(!hud.paused);
   }
-
-  engineToggle.onclick = async () => {
-    if (engineRunning) {
-      await browser.runtime.sendMessage({ type: 'ENGINE_STOP' }).catch(() => {});
-      await sendToTab({ type: 'HINT_HIDE' });
-      setEngineBtn(false);
-    } else {
-      await browser.runtime.sendMessage({ type: 'ENGINE_REGISTER' }).catch(() => {});
-      await sendToTab({ type: 'HINT_SHOW' });
-      setEngineBtn(true);
-    }
+  hintsToggle.onclick = async () => {
+    const r = await sendToTab({ type: hintsOn ? 'HINT_HIDE' : 'HINT_SHOW' });
+    if (!r || !r.ok) { showStatus('Open a Lichess game to use hints'); return; }
+    setHintsBtn(!r.paused);
   };
+
+  // ---- Data settings ----
+  function openDataSettings(e) {
+    if (e) e.preventDefault();
+    browser.tabs.create({ url: browser.runtime.getURL('consent.html') }).catch(() => {});
+    window.close();
+  }
+  if (dataSettings) dataSettings.addEventListener('click', openDataSettings);
+  if (consentNeeded) consentNeeded.addEventListener('click', openDataSettings);
+  try {
+    const c = await browser.runtime.sendMessage({ type: 'CONSENT_GET' });
+    if (consentNeeded) consentNeeded.style.display = (c && (c.state === 'granted' || c.state === 'denied')) ? 'none' : '';
+  } catch (_) {
+    if (consentNeeded) consentNeeded.style.display = '';
+  }
 
   // MASTER MODE EASTER EGG (hidden trainer view)
   // KEEP THIS BLOCK. In release it stays hidden — there is no visible
   // control. Normal HUD shows "Rook d2►" (piece + start square, target
   // hidden). Master mode shows the FULL move ("Rook d2-d4") for self-
   // checking. Toggle by clicking the logo:
-  // • 8 LEFT clicks → Master mode ON
-  // • 3 WHEEL clicks → Master mode OFF (also a safe accidental reset)
+  // - 8 LEFT clicks → Master mode ON
+  // - 3 WHEEL clicks → Master mode OFF (also a safe accidental reset)
   // Click series must be quick: gap up to 800 ms (touchpad-friendly);
   // a longer pause resets the counter so stray clicks do nothing.
   const gmLogo = document.getElementById('gm-logo');
@@ -234,15 +277,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const WHEEL_NEEDED = 3;       // wheel clicks to turn it OFF
 
   async function setMaster(on) {
-    await browser.storage.sync.set({ masterMode: on });
+    await apply({ masterMode: on });
     await sendToTab({ type: 'SET_MASTER', on });
   }
-  // Flash a short message in the subtitle, then restore the engine label.
+  // Flash a short message in the subtitle, then restore the version label.
   function flashSubtitle(text) {
     if (!gmSubtitle) return;
-    const restore = gmSubtitle.textContent;
     gmSubtitle.textContent = text;
-    setTimeout(() => { gmSubtitle.textContent = restore; }, 1400);
+    setTimeout(() => { gmSubtitle.textContent = SUBTITLE; }, 1400);
   }
 
   if (gmLogo) {
@@ -278,27 +320,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   // end MASTER MODE EASTER EGG
 
   // ---- News plate ----
-  // Background stores an unread announcement in `pendingNews` (fetched from
-  // GitHub news.json). We show it as a dismissible plate at the top of the popup.
+  // Shown when there is an unread item; independent of game access. Text
+  // only; the link is checked again here before opening (https, allowed host).
   const newsPlate = document.getElementById('news-plate');
   const newsText  = document.getElementById('news-text');
   const newsClose = document.getElementById('news-close');
   try {
     const r = await browser.runtime.sendMessage({ type: 'GET_NEWS' });
-    const news = r && r.pendingNews;
-    if (news && news.title) {
+    const news = validateNews(r && r.news);
+    if (news) {
       newsText.textContent = news.title;
       newsPlate.style.display = 'flex';
-      if (news.url) {
+      const url = safeNewsUrl(news.url);
+      if (url) {
         newsPlate.onclick = (e) => {
           if (e.target === newsClose) return;
-          browser.tabs.create({ url: news.url });
+          browser.tabs.create({ url }).catch(() => {});
         };
+      } else {
+        newsPlate.style.cursor = 'default';
       }
       newsClose.onclick = async (e) => {
         e.stopPropagation();
-        newsPlate.style.display = 'none';
-        await browser.runtime.sendMessage({ type: 'DISMISS_NEWS' }).catch(() => {});
+        let ok = false;
+        try { ok = !!(await browser.runtime.sendMessage({ type: 'DISMISS_NEWS', id: news.id }) || {}).ok; } catch (_) {}
+        if (ok) newsPlate.style.display = 'none';
+        else showStatus('Could not dismiss the news: extension storage unavailable');
       };
     }
   } catch(_) {}

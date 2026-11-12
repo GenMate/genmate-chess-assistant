@@ -2,12 +2,10 @@
   "manifest_version": 2,
   "name": "Chess Assistant by GenMate",
   "short_name": "GenMate",
-  "description": "Stockfish Lite engine hints while you play vs computer on Lichess",
-  "version": "1.1.0",
+  "description": "Local Stockfish Lite and Full engine hints while you play vs computer on Lichess",
+  "version": "1.2.0",
   "permissions": [
     "storage",
-    "activeTab",
-    "tabs",
     "notifications",
     "https://lichess.org/*",
     "https://raw.githubusercontent.com/*"
@@ -33,13 +31,11 @@
         "https://lichess.org/*"
       ],
       "js": [
-        "chess.min.js",
+        "chess.js",
+        "common.js",
         "content.js"
       ]
     }
-  ],
-  "web_accessible_resources": [
-    "wasm/*"
   ],
   "browser_specific_settings": {
     "gecko": {
@@ -48,6 +44,10 @@
       "data_collection_permissions": {
         "required": [
           "none"
+        ],
+        "optional": [
+          "authenticationInfo",
+          "browsingActivity"
         ]
       }
     }

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GenMate Chess Assistant — Data settings</title>
+  <!-- Data settings for GenMate Chess Assistant (data consent).
+       One page with every choice; nothing is pre-selected. No external
+       resources. Logic: consent.js. -->
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0; background: #f3f6f4; color: #293530;
+      font: 15px/1.6 system-ui, -apple-system, sans-serif;
+    }
+    main { max-width: 680px; margin: 0 auto; padding: 28px 18px 40px; }
+    h1 { font-size: 22px; margin: 0 0 4px; color: #293530; }
+    h2 { font-size: 16px; margin: 26px 0 8px; color: #293530; }
+    .sub { color: #5d6c64; font-size: 13px; margin: 0 0 18px; }
+    .card { background: #ffffff; border: 1px solid #c4d1ca; border-radius: 10px; padding: 14px 16px; }
+    ul { margin: 6px 0 0; padding-left: 20px; }
+    li { margin: 4px 0; }
+    .state { margin: 14px 0 0; font-weight: 600; }
+    .state.granted { color: #18713d; }
+    .state.denied, .state.undecided { color: #735719; }
+    .state.error { color: #b52c2c; }
+    .choices { display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+    .choices button, .plain {
+      flex: 1 1 200px; padding: 12px 14px; border-radius: 8px; font: 600 15px system-ui, sans-serif;
+      border: 1px solid #b7c7bd; background: #ffffff; color: #293530; cursor: pointer;
+    }
+    .choices button:hover, .plain:hover { border-color: #087952; }
+    button:disabled { opacity: .5; cursor: default; }
+    .plain { flex: 0 0 auto; }
+    .row { display: flex; align-items: flex-start; gap: 10px; }
+    .row input { width: 18px; height: 18px; margin-top: 3px; flex-shrink: 0; }
+    .note { color: #5d6c64; font-size: 13px; }
+    .msg { margin-top: 10px; font-size: 13px; color: #735719; min-height: 1em; }
+      /* Approved filled controls and the same Deep navy palette as the popup. */
+    body { color:#17232e; }
+    h1 { color:#fff; background:#0c223b; padding:20px 18px; border-radius:10px; }
+    .note { color:#263645; font-size:15px; }
+    .choices button, .plain { border:0; background:#475569; color:#fff; font-weight:700; }
+    #allow { background:#008737; color:#fff; }
+    #allow:hover { background:#00752f; }
+    #deny:hover, #withdraw:hover { background:#334155; }
+    #uninstall { background:#334155; color:#fff; }
+    #uninstall:hover { background:#263645; }
+    summary { color:#075fc8; font-weight:700; cursor:pointer; }
+    button:focus-visible, summary:focus-visible { outline:3px solid #075fc8; outline-offset:3px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Enable hints against the computer</h1>
+  <div class="card" style="margin-top:18px">
+    <p>GenMate sends your Lichess token and game ID only to lichess.org to read your game.
+      Stockfish runs locally in your browser. No analytics.</p>
+    <p class="note">Without permission, hints stay off.</p>
+    <div class="choices">
+      <button id="allow" type="button">Allow game access</button>
+      <button id="deny" type="button">Don't allow</button>
+    </div>
+    <div id="state" class="state" style="display:none">Checking current choice…</div>
+    <div class="choices">
+      <button id="withdraw" class="plain" type="button" style="display:none">Withdraw game access</button>
+    </div>
+    <div id="game-msg" class="msg"></div>
+  </div>
+  <details style="margin-top:20px">
+    <summary>More information</summary>
+    <h2>Your token</h2>
+    <p>The extension stores your token and settings in this browser only (not synced).
+      A token saved by version 1.1.0 may also remain in Firefox Sync storage.
+      “Remove token” in the toolbar popup deletes the local token and requests removal of the old Sync copy.
+      Removing it from the extension does not revoke it on Lichess.</p>
+    <h2>Extension news</h2>
+    <p>The extension checks a small news file hosted on GitHub every few hours by default.
+      These requests contain no token, game or browsing data. Unread news can be dismissed in the popup.
+      Each news item produces at most one system notification.</p>
+  </details>
+  <div class="choices" style="margin-top:20px">
+    <button id="uninstall" class="plain" type="button">Remove extension</button>
+  </div>
+</main>
+<script src="common.js"></script>
+<script src="consent.js"></script>
+</body>
+</html>
